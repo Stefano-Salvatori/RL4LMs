@@ -8,6 +8,9 @@ from rl4lms.envs.text_generation.training_utils import (
     OnPolicyTrainer,
     SupervisedTrainer,
 )
+from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
+
+os.environ["PYTHONIOENCODING"] = "utf8"
 
 
 def main(
@@ -22,6 +25,15 @@ def main(
     # load the config file
     with open(config_path, "r") as fp:
         config = yaml.safe_load(fp)
+
+    # We istantiate the summarization model so that it can be used by the reward and metric function
+    GLOBAL_SUMMARIZATION_MODEL.istantiate(
+        load_path=config["shared_summarization_model"]["load_path"],
+        max_new_tokens=config["shared_summarization_model"]["max_new_tokens"],
+        device=config["shared_summarization_model"]["device"],
+        base_model=config["shared_summarization_model"]["base_model"],
+        load_from_state_dict=config["shared_summarization_model"]["load_from_state_dict"],
+    )
 
     # load tracker
     tracker = Tracker(
@@ -58,27 +70,21 @@ def main(
 if __name__ == "__main__":
     parser = ArgumentParser(description="Fine-tune LM to generate controlled text")
     parser.add_argument("--config_path", type=str, help="path to the config file")
-    parser.add_argument(
-        "--project_name", type=str, help="WANDB project name", default="rl4lm_exps"
-    )
+    parser.add_argument("--project_name", type=str, help="WANDB project name", default="rl4lm_exps")
     parser.add_argument(
         "--experiment_name",
         type=str,
         help="WANDB experiment name",
         default="rl4lm_experiment",
     )
-    parser.add_argument(
-        "--entity_name", type=str, help="WANDB entity name", default=None
-    )
+    parser.add_argument("--entity_name", type=str, help="WANDB entity name", default=None)
     parser.add_argument(
         "--base_path_to_store_results",
         type=str,
         help="Base path to store experiment results",
         default=os.getcwd(),
     )
-    parser.add_argument(
-        "--log_to_wandb", action="store_true", help="Whether to use wandb logging"
-    )
+    parser.add_argument("--log_to_wandb", action="store_true", help="Whether to use wandb logging")
     args = parser.parse_args()
 
     main(
