@@ -1,0 +1,70 @@
+tokenizer:
+  model_name: /home/raffoni/DearWatson/best_checkpoint/t5-sl
+  padding_side: left
+  truncation_side: left
+  pad_token_as_eos_token: True
+
+shared_summarization_model:
+  load_path: "/home/italiani/dear-watson/DearWatson/dialogled_glabal_attn_sl/best_model.pth"
+  max_new_tokens: 128
+  device: "cuda"
+  base_model: "MingZhong/DialogLED-large-5120"
+  load_from_state_dict: True
+
+reward_fn:
+  id: summarizer_rouge
+
+datapool:
+  id: samsum
+  #args:
+  #  prompt_prefix: "Summarize: "
+
+env:
+  n_envs: 2
+  args:
+    max_prompt_length: 512
+    max_episode_length: 100
+    terminate_on_eos: True
+    prompt_truncation_side: "right"
+    context_start_token: 0
+
+alg:
+  id: nlpo
+  args:
+    n_steps: 512
+    batch_size: 4
+    verbose: 0
+    learning_rate: 0.000002
+    n_epochs: 5
+    ent_coef: 0.01
+  kl_div:
+    coeff: 0.01
+    target_kl: 0.2
+  policy:
+    id: maskable_seq2seq_lm_actor_critic_policy
+    args:
+      model_name: /home/raffoni/DearWatson/best_checkpoint/t5-sl
+      apply_model_parallel: True
+      prompt_truncation_side: "right"
+      min_tokens_to_keep: 50
+      top_mask: 0.9
+      mask_type: "learned_top_p"
+      generation_kwargs:
+        do_sample: True
+        top_k: 50
+        min_length: 40
+        max_new_tokens: 512
+
+train_evaluation:
+  eval_batch_size: 16
+  n_iters: 100
+  eval_every: 2
+  save_every: 2
+  metrics:
+    - id: augmented_summarization_rouge
+  generation_kwargs:
+    do_sample: True
+    top_k: 10
+    temperature: 0.8
+    min_length: 40
+    max_new_tokens: 512

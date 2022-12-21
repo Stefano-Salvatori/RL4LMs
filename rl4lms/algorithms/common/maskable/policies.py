@@ -237,7 +237,8 @@ class MaskableActorCriticPolicy(BasePolicy):
         #     mask = [False for _ in range(self.n_envs)]
 
         # Switch to eval mode (this affects batch norm / dropout)
-        self.set_training_mode(False)
+        #self.set_training_mode(False)
+        self.eval()
 
         observation, vectorized_env = self.obs_to_tensor(observation)
 

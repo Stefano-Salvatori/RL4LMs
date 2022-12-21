@@ -20,10 +20,12 @@ from rl4lms.data_pools.custom_text_generation_pools import (
     WMT14PreprocessedEnDe,
     WMT16NewsOnlyDatasetEnDe,
     DailyDialog,
+    SamSum,
 )
 from rl4lms.data_pools.text_generation_pool import TextGenPool
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
 from rl4lms.envs.text_generation.metric import (
+    AugmentedSummarizationRouge,
     BaseMetric,
     BERTScoreMetric,
     BLEUMetric,
@@ -63,12 +65,15 @@ from rl4lms.envs.text_generation.reward import (
     BLEURTRewardFunction,
     CommonGenPenaltyShapingFunction,
     LearnedRewardFunction,
+    LetterCounterRewardFunction,
     MeteorRewardFunction,
     PARENTRewardFunction,
     RewardFunction,
     RougeCombined,
     RougeLMaxRewardFunction,
     RougeRewardFunction,
+    BatchedRougeSummarizerRewardFunction,
+    RougeSummarizerRewardFunction,
     SacreBleu,
     SpiderRewardFunction,
     chrF,
@@ -98,6 +103,7 @@ class DataPoolRegistry:
         "iwslt2017en_de": IWSLT2017EnDe,
         "crd3": CRD3DialogueGeneration,
         "daily_dialog": DailyDialog,
+        "samsum": SamSum,
     }
 
     @classmethod
@@ -132,6 +138,9 @@ class RewardFunctionRegistry:
         "chrf": chrF,
         "intent_accuracy": IntentAccuracy,
         "common_gen_preference_model": CommonGenPrefRM,
+        "batched_summarizer_rouge": BatchedRougeSummarizerRewardFunction,
+        "summarizer_rouge": RougeSummarizerRewardFunction,
+        "letter_counter": LetterCounterRewardFunction,
     }
 
     @classmethod
@@ -168,6 +177,7 @@ class MetricRegistry:
         "ter": TERMetric,
         "chrf": chrFmetric,
         "intent_accuracy": IntentAccuracyDailyDialog,
+        "augmented_summarization_rouge": AugmentedSummarizationRouge,
     }
 
     @classmethod
@@ -208,9 +218,7 @@ class AlgorithmRegistry:
     }
 
     @classmethod
-    def get(
-        cls, alg_id: str
-    ) -> Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]:
+    def get(cls, alg_id: str) -> Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]:
         try:
             alg_cls = cls._registry[alg_id]
         except KeyError:
@@ -218,9 +226,7 @@ class AlgorithmRegistry:
         return alg_cls
 
     @classmethod
-    def add(
-        cls, id: str, alg_cls: Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]
-    ):
+    def add(cls, id: str, alg_cls: Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]):
         AlgorithmRegistry._registry[id] = alg_cls
 
 

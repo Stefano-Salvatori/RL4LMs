@@ -364,7 +364,8 @@ def wrap_onpolicy_alg(
             tokenizer = tokenizer[0]
 
             # Switch to eval mode
-            self.policy.set_training_mode(False)
+            # self.policy.set_training_mode(False)
+            self.policy.eval()
 
             # reset rollout buffer and stats
             rollout_buffer.reset()

@@ -3,7 +3,7 @@ from abc import ABC, abstractclassmethod
 import torch
 from datasets import load_metric
 from rl4lms.envs.text_generation.observation import Observation
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, AutoModelForSeq2SeqLM, AutoConfig
 from rl4lms.envs.text_generation.metric import (
     CIDERMetric,
     MeteorMetric,
@@ -18,6 +18,7 @@ from rl4lms.envs.text_generation.metric import (
 )
 import numpy as np
 from typing import List, Dict, Any
+from collections import Counter
 
 
 class RewardFunction(ABC):
@@ -129,11 +130,7 @@ class MeteorRewardFunction(RewardFunction):
         self._metric = MeteorMetric()
         from rl4lms.envs.text_generation.registry import RewardFunctionRegistry
 
-        self._shaping_fn = (
-            RewardFunctionRegistry.get(shaping_fn, {})
-            if shaping_fn is not None
-            else shaping_fn
-        )
+        self._shaping_fn = RewardFunctionRegistry.get(shaping_fn, {}) if shaping_fn is not None else shaping_fn
 
     def __call__(
         self,
@@ -152,28 +149,20 @@ class MeteorRewardFunction(RewardFunction):
             score = metric_dict["lexical/meteor"][1]
 
             if self._shaping_fn is not None:
-                aux_score = self._shaping_fn(
-                    current_observation, action, next_observation, done, meta_info
-                )
+                aux_score = self._shaping_fn(current_observation, action, next_observation, done, meta_info)
                 score = score + aux_score
             return score
         return 0
 
 
 class RougeRewardFunction(RewardFunction):
-    def __init__(
-        self, rouge_type: str, shaping_fn: str = None, use_single_ref: bool = True
-    ) -> None:
+    def __init__(self, rouge_type: str, shaping_fn: str = None, use_single_ref: bool = True) -> None:
         super().__init__()
         self._metric = load_metric("rouge")
         self._rouge_type = rouge_type
         from rl4lms.envs.text_generation.registry import RewardFunctionRegistry
 
-        self._shaping_fn = (
-            RewardFunctionRegistry.get(shaping_fn, {})
-            if shaping_fn is not None
-            else shaping_fn
-        )
+        self._shaping_fn = RewardFunctionRegistry.get(shaping_fn, {}) if shaping_fn is not None else shaping_fn
         self._use_single_ref = use_single_ref
 
     def __call__(
@@ -192,14 +181,10 @@ class RougeRewardFunction(RewardFunction):
                 references = [next_observation.target_or_reference_texts]
             predicted = [next_observation.context_text]
 
-            metric_results = self._metric.compute(
-                predictions=predicted, references=references, use_stemmer=True
-            )
+            metric_results = self._metric.compute(predictions=predicted, references=references, use_stemmer=True)
             reward = metric_results[self._rouge_type].mid.fmeasure
             if self._shaping_fn is not None:
-                aux_score = self._shaping_fn(
-                    current_observation, action, next_observation, done, meta_info
-                )
+                aux_score = self._shaping_fn(current_observation, action, next_observation, done, meta_info)
                 reward = reward + aux_score
             return reward
         return 0
@@ -211,11 +196,7 @@ class RougeCombined(RewardFunction):
         self._metric = load_metric("rouge")
         from rl4lms.envs.text_generation.registry import RewardFunctionRegistry
 
-        self._shaping_fn = (
-            RewardFunctionRegistry.get(shaping_fn, {})
-            if shaping_fn is not None
-            else shaping_fn
-        )
+        self._shaping_fn = RewardFunctionRegistry.get(shaping_fn, {}) if shaping_fn is not None else shaping_fn
 
     def __call__(
         self,
@@ -230,19 +211,13 @@ class RougeCombined(RewardFunction):
             references = [next_observation.target_or_reference_texts[0]]
             predicted = [next_observation.context_text]
 
-            metric_results = self._metric.compute(
-                predictions=predicted, references=references, use_stemmer=True
-            )
+            metric_results = self._metric.compute(predictions=predicted, references=references, use_stemmer=True)
 
             rouge_keys = ["rouge1", "rouge2", "rougeL"]
-            scores = [
-                metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys
-            ]
+            scores = [metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys]
             reward = np.mean(scores)
             if self._shaping_fn is not None:
-                aux_score = self._shaping_fn(
-                    current_observation, action, next_observation, done, meta_info
-                )
+                aux_score = self._shaping_fn(current_observation, action, next_observation, done, meta_info)
                 reward = reward + aux_score
             return reward
         return 0
@@ -309,17 +284,13 @@ class SacreBleu(RewardFunction):
         if done:
             references = [next_observation.target_or_reference_texts]
             predicted = [next_observation.context_text]
-            metric_results = self._metric.compute(
-                predictions=predicted, references=references, **self._args
-            )
+            metric_results = self._metric.compute(predictions=predicted, references=references, **self._args)
             return metric_results["score"] / 100
         return 0
 
 
 class SpiderRewardFunction(BatchedRewardFunction):
-    def __init__(
-        self, spice_coeff: float, cider_coeff: float, shaping_fn: str = None
-    ) -> None:
+    def __init__(self, spice_coeff: float, cider_coeff: float, shaping_fn: str = None) -> None:
         """
         Spice + Cider
         """
@@ -330,11 +301,7 @@ class SpiderRewardFunction(BatchedRewardFunction):
         self._cider_coeff = cider_coeff
         from rl4lms.envs.text_generation.registry import RewardFunctionRegistry
 
-        self._shaping_fn = (
-            RewardFunctionRegistry.get(shaping_fn, {})
-            if shaping_fn is not None
-            else shaping_fn
-        )
+        self._shaping_fn = RewardFunctionRegistry.get(shaping_fn, {}) if shaping_fn is not None else shaping_fn
 
     def __call__(
         self,
@@ -349,9 +316,7 @@ class SpiderRewardFunction(BatchedRewardFunction):
         refs = []
         indices_with_done = []
         rewards = torch.zeros(len(prompt_texts))
-        for ix, (prompt, gen, ref, done) in enumerate(
-            zip(prompt_texts, gen_texts, ref_texts, dones)
-        ):
+        for ix, (prompt, gen, ref, done) in enumerate(zip(prompt_texts, gen_texts, ref_texts, dones)):
             if done:
                 prompts.append(prompt)
                 gens.append(gen)
@@ -359,24 +324,16 @@ class SpiderRewardFunction(BatchedRewardFunction):
                 indices_with_done.append(ix)
 
         if len(indices_with_done) > 0:
-            spice_scores = self._spice_metric.compute(prompts, gens, refs)[
-                "lexical/spice"
-            ][0]
-            cider_scores = self._cider_metric.compute(prompts, gens, refs)[
-                "lexical/cider"
-            ][0]
-            total_scores = self._spice_coeff * np.array(
-                spice_scores
-            ) + self._cider_coeff * np.array(cider_scores)
+            spice_scores = self._spice_metric.compute(prompts, gens, refs)["lexical/spice"][0]
+            cider_scores = self._cider_metric.compute(prompts, gens, refs)["lexical/cider"][0]
+            total_scores = self._spice_coeff * np.array(spice_scores) + self._cider_coeff * np.array(cider_scores)
 
             if self._shaping_fn is not None:
                 aux_scores = self._shaping_fn(prompt_texts, gen_texts, ref_texts, dones)
             else:
                 aux_scores = [0] * len(indices_with_done)
 
-            for ind, score, aux_score in zip(
-                indices_with_done, total_scores, aux_scores
-            ):
+            for ind, score, aux_score in zip(indices_with_done, total_scores, aux_scores):
                 rewards[ind] = score + aux_score
 
         return rewards
@@ -388,16 +345,12 @@ class SpiderRewardFunction(BatchedRewardFunction):
 
 
 class LearnedRewardFunction(RewardFunction):
-    def __init__(
-        self, model_name: str, label_ix: int, include_prompt_for_eval: bool = True
-    ) -> None:
+    def __init__(self, model_name: str, label_ix: int, include_prompt_for_eval: bool = True) -> None:
         super().__init__()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._metric_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._metric_tokenizer.truncation_side = "left"
-        self._metric_model = AutoModelForSequenceClassification.from_pretrained(
-            model_name
-        ).to(self._device)
+        self._metric_model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self._device)
         self._label_ix = label_ix
         self._include_prompt_for_eval = include_prompt_for_eval
 
@@ -410,17 +363,11 @@ class LearnedRewardFunction(RewardFunction):
         meta_info: Dict[str, Any] = None,
     ) -> float:
         if done:
-            generated_text = (
-                current_observation.prompt_or_input_text
-                if self._include_prompt_for_eval
-                else ""
-            )
+            generated_text = current_observation.prompt_or_input_text if self._include_prompt_for_eval else ""
             generated_text += next_observation.context_text
 
             with torch.no_grad():
-                encoded = self._metric_tokenizer(
-                    generated_text, return_tensors="pt", truncation=True, padding=True
-                )
+                encoded = self._metric_tokenizer(generated_text, return_tensors="pt", truncation=True, padding=True)
                 outputs = self._metric_model(
                     input_ids=encoded.input_ids.to(self._device),
                     attention_mask=encoded.attention_mask.to(self._device),
@@ -447,9 +394,7 @@ class BLEURTRewardFunction(RewardFunction):
         if done:
             references = [next_observation.target_or_reference_texts]
             predicted = [next_observation.context_text]
-            metric_results = self._metric.compute(
-                predictions=predicted, references=references
-            )
+            metric_results = self._metric.compute(predictions=predicted, references=references)
             score = metric_results["scores"][0]
             return score
         return 0
@@ -554,9 +499,7 @@ class chrF(RewardFunction):
 
 
 class IntentAccuracy(BatchedRewardFunction):
-    def __init__(
-        self, shape: bool = True, intent_coeff: float = 1.0, auto_coeff: float = 1.0
-    ) -> None:
+    def __init__(self, shape: bool = True, intent_coeff: float = 1.0, auto_coeff: float = 1.0) -> None:
         super().__init__()
         self._metric = None
         self._shape = shape
@@ -595,48 +538,148 @@ class IntentAccuracy(BatchedRewardFunction):
                 done_ixs.append(ix)
 
                 if self._shape:
-                    score = self._shaping_metric.compute(
-                        done_prompt_texts, done_gen_texts, done_ref_texts
-                    )
+                    score = self._shaping_metric.compute(done_prompt_texts, done_gen_texts, done_ref_texts)
                     rewards[ix] = self._auto_coeff * score["lexical/meteor"][1]
 
-        scores = self._metric.compute(
-            done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos
-        )["intent/accuracy"][0]
+        scores = self._metric.compute(done_prompt_texts, done_gen_texts, done_ref_texts, done_meta_infos)[
+            "intent/accuracy"
+        ][0]
         rewards[done_ixs] += self._intent_coeff * np.array(scores)
         return rewards.tolist()
 
 
+class LetterCounterRewardFunction(RewardFunction):
+    def __init__(self, letter: str = "k") -> None:
+        super().__init__()
+        self.letter = letter
+
+    def __call__(
+        self,
+        prev_observation: Observation,
+        action: int,
+        current_observation: Observation,
+        done: bool,
+        meta_info: Dict[str, Any] = None,
+    ) -> float:
+        if done:
+            return (
+                Counter(current_observation.context_text)[self.letter]
+                if self.letter in current_observation.context_text
+                else 0
+            )
+        return 0
+
+
+class RougeSummarizerRewardFunction(RewardFunction):
+    def __init__(
+        self,
+    ) -> None:
+        super().__init__()
+
+        from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
+
+        self._summarization_model = GLOBAL_SUMMARIZATION_MODEL
+
+        self._metric = load_metric("rouge")
+
+    def __call__(
+        self,
+        prev_observation: Observation,
+        action: int,
+        current_observation: Observation,
+        done: bool,
+        meta_info: Dict[str, Any] = None,
+    ) -> float:
+        if done:
+            summary = self._summarization_model.summarize(current_observation.context_text)
+            metric_results = self._metric.compute(
+                predictions=summary, references=current_observation.target_or_reference_texts, use_stemmer=True
+            )
+            rouge_keys = ["rouge1", "rouge2", "rougeL"]
+            reward = np.mean([metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys])
+            return reward
+        return 0
+
+
+class BatchedRougeSummarizerRewardFunction(BatchedRewardFunction):
+    def __init__(
+        self,
+        # base_model: str = "",
+        # max_new_tokens: int = 256,
+        # device: torch.device = None,
+        # load_from_state_dict: bool = False,
+        # load_path: str = None,
+        # special_tokens=["<sl>", "<\sl>"],
+    ) -> None:
+        super().__init__()
+
+        from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
+
+        self._summarization_model = GLOBAL_SUMMARIZATION_MODEL
+
+        self._metric = load_metric("rouge")
+
+    def __call__(
+        self,
+        prompt_texts: List[str],
+        gen_texts: List[str],
+        ref_texts: List[List[str]],
+        dones: List[bool],
+        meta_infos: List[Dict[str, Any]] = None,
+    ) -> List[float]:
+        done_gen_texts = [g for i, g in enumerate(gen_texts) if dones[i]]
+        done_ref_texts = [r for i, r in enumerate(ref_texts) if dones[i]]
+        torch.cuda.empty_cache()
+        summaries = self._summarization_model.summarize(done_gen_texts)
+        scores = []
+        for summary, ref in zip(summaries, done_ref_texts):
+            metric_results = self._metric.compute(predictions=[summary], references=ref, use_stemmer=True)
+            rouge_keys = ["rouge1", "rouge2", "rougeL"]
+            scores.append(np.mean([metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys]))
+        return scores
+
+
 if __name__ == "__main__":
-    predictions = "hello there general kenobi"
-    references = ["hello there general kenobi", "hello there!!"]
-    observation = Observation(
-        None, None, None, None, None, predictions, references, None, None, None, None
+    # predictions = "hello there general kenobi"
+    # references = ["hello there general kenobi", "hello there!!"]
+    # observation = Observation(None, None, None, None, None, predictions, references, None, None, None, None)
+
+    # reward_fn = MeteorRewardFunction()
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = chrF()
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = RougeCombined()
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = RougeRewardFunction(rouge_type="rouge1")
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = RougeRewardFunction(rouge_type="rouge2")
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = RougeRewardFunction(rouge_type="rougeL")
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = BERTScoreRewardFunction(language="en")
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = BLEURewardFunction()
+    # print(reward_fn(None, None, observation, True))
+
+    # reward_fn = BLEURTRewardFunction()
+    # print(reward_fn(None, None, observation, True))
+
+    # Test batched reward function
+    predictions = ["hello there general kenobi", "The cat is on the table"]
+    references = [["hello there general kenobi", "hello there!!"], ["The cat is on"]]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    reward_fn = RougeSummarizerRewardFunction(
+        base_model="MingZhong/DialogLED-large-5120",
+        max_new_tokens=64,
+        device="cuda",
+        load_from_state_dict=True,
+        load_path="/home/italiani/dear-watson/DearWatson/dialogled_glabal_attn_sl/best_model.pth",
     )
-
-    reward_fn = MeteorRewardFunction()
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = chrF()
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = RougeCombined()
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = RougeRewardFunction(rouge_type="rouge1")
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = RougeRewardFunction(rouge_type="rouge2")
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = RougeRewardFunction(rouge_type="rougeL")
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = BERTScoreRewardFunction(language="en")
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = BLEURewardFunction()
-    print(reward_fn(None, None, observation, True))
-
-    reward_fn = BLEURTRewardFunction()
-    print(reward_fn(None, None, observation, True))
+    print(reward_fn(None, predictions, references, [True, True]))

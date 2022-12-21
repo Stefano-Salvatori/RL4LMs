@@ -53,9 +53,7 @@ class LearnedRewardMetric(BaseMetric):
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._tokenizer.truncation_side = "left"
-        self._model = AutoModelForSequenceClassification.from_pretrained(model_name).to(
-            self._device
-        )
+        self._model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self._device)
         self._label_ix = label_ix
         self._batch_size = batch_size
         self._include_prompt_for_eval = include_prompt_for_eval
@@ -73,21 +71,12 @@ class LearnedRewardMetric(BaseMetric):
         current_ix = 0
         n_texts = len(generated_texts)
         while current_ix < n_texts:
-            batch_gen_texts = generated_texts[
-                current_ix : current_ix + self._batch_size
-            ]
-            batch_prompt_texts = prompt_texts[
-                current_ix : current_ix + self._batch_size
-            ]
+            batch_gen_texts = generated_texts[current_ix : current_ix + self._batch_size]
+            batch_prompt_texts = prompt_texts[current_ix : current_ix + self._batch_size]
 
             if self._include_prompt_for_eval:
-                batch_gen_texts = [
-                    (prompt + gen)
-                    for gen, prompt in zip(batch_gen_texts, batch_prompt_texts)
-                ]
-            encoded = self._tokenizer(
-                batch_gen_texts, return_tensors="pt", truncation=True, padding=True
-            )
+                batch_gen_texts = [(prompt + gen) for gen, prompt in zip(batch_gen_texts, batch_prompt_texts)]
+            encoded = self._tokenizer(batch_gen_texts, return_tensors="pt", truncation=True, padding=True)
             with torch.no_grad():
                 outputs = self._model(
                     input_ids=encoded.input_ids.to(self._device),
@@ -98,9 +87,7 @@ class LearnedRewardMetric(BaseMetric):
                 all_scores.extend(scores)
             current_ix += self._batch_size
 
-        metric_dict = {
-            "semantic/learned_automodel_metric": (all_scores, np.mean(all_scores))
-        }
+        metric_dict = {"semantic/learned_automodel_metric": (all_scores, np.mean(all_scores))}
         return metric_dict
 
 
@@ -119,9 +106,7 @@ class MeteorMetric(BaseMetric):
         split_name: str = None,
     ):
 
-        score = self._metric.compute(
-            predictions=generated_texts, references=reference_texts
-        )["meteor"]
+        score = self._metric.compute(predictions=generated_texts, references=reference_texts)["meteor"]
 
         metric_dict = {"lexical/meteor": (None, score)}
         return metric_dict
@@ -149,9 +134,7 @@ class RougeMetric(BaseMetric):
         else:
             ref_texts = reference_texts
 
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=ref_texts, use_stemmer=True
-        )
+        metric_results = self._metric.compute(predictions=generated_texts, references=ref_texts, use_stemmer=True)
         score_keys = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
         metric_dict = {}
         for rouge_type in score_keys:
@@ -238,9 +221,7 @@ class BLEURTMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=reference_texts
-        )
+        metric_results = self._metric.compute(predictions=generated_texts, references=reference_texts)
         corpus_score = np.mean(metric_results["scores"])
         metric_dict = {"semantic/bleurt": (metric_results["scores"], corpus_score)}
         return metric_dict
@@ -255,17 +236,13 @@ def get_generated_and_predictions(
     split_name = "" if split_name is None else split_name
     preds = {}
     refs = {}
-    for ix, (prompt_text, gen_text, ref_text) in enumerate(
-        zip(prompt_texts, generated_texts, reference_texts)
-    ):
+    for ix, (prompt_text, gen_text, ref_text) in enumerate(zip(prompt_texts, generated_texts, reference_texts)):
         preds[split_name + prompt_text] = [gen_text]
         refs[split_name + prompt_text] = ref_text
     return preds, refs
 
 
-def get_individual_scores(
-    prompt_texts: List[str], split_name: str, scores_dict: Dict[str, float]
-):
+def get_individual_scores(prompt_texts: List[str], split_name: str, scores_dict: Dict[str, float]):
     split_name = "" if split_name is None else split_name
     scores = []
     for prompt_text in prompt_texts:
@@ -293,9 +270,7 @@ class CIDERMetric(BaseMetric):
             corpus_score,
             individual_scores,
         ) = self._metric.compute_score(references, predictions)
-        individual_scores = get_individual_scores(
-            prompt_texts, split_name, individual_scores
-        )
+        individual_scores = get_individual_scores(prompt_texts, split_name, individual_scores)
 
         metric_dict = {"lexical/cider": (individual_scores, corpus_score)}
         return metric_dict
@@ -322,9 +297,7 @@ class SpiceMetric(BaseMetric):
             individual_scores,
         ) = self._metric.compute_score(references, predictions)
 
-        individual_scores = get_individual_scores(
-            prompt_texts, split_name, individual_scores
-        )
+        individual_scores = get_individual_scores(prompt_texts, split_name, individual_scores)
 
         metric_dict = {"lexical/spice": (individual_scores, corpus_score)}
         return metric_dict
@@ -406,9 +379,7 @@ class SummaCConvMetric(BaseMetric):
     ) -> Tuple[List[float], float]:
         metric_results = self._scorer.score(prompt_texts, generated_texts)
         corpus_score = np.mean(metric_results["scores"])
-        metric_dict = {
-            "consistency/summacconv": (metric_results["scores"], corpus_score)
-        }
+        metric_dict = {"consistency/summacconv": (metric_results["scores"], corpus_score)}
         return metric_dict
 
 
@@ -498,9 +469,7 @@ class ParentToTTo:
         split_name: str = None,
     ):
         tables = [info["raw_table"] for info in meta_infos]
-        parent_overall, parent_overlap, parent_non_overlap = compute_parent(
-            generated_texts, tables
-        )
+        parent_overall, parent_overlap, parent_non_overlap = compute_parent(generated_texts, tables)
 
         metric_results = {}
         metric_names = ["parent_overall", "parent_overlap", "parent_non_overlap"]
@@ -540,9 +509,7 @@ class BLEUToTTo:
         split_name: str = None,
     ):
         tables = [info["raw_table"] for info in meta_infos]
-        bleu_overall, bleu_overlap, bleu_non_overlap = compute_bleu(
-            generated_texts, tables
-        )
+        bleu_overall, bleu_overlap, bleu_non_overlap = compute_bleu(generated_texts, tables)
 
         metric_results = {
             "table_to_text/bleu_overall": (None, bleu_overall),
@@ -606,9 +573,7 @@ class SacreBLEUMetric(BaseMetric):
         split_name: str = None,
     ) -> Tuple[List[float], float]:
 
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=reference_texts, **self._args
-        )
+        metric_results = self._metric.compute(predictions=generated_texts, references=reference_texts, **self._args)
         bleu_score = metric_results["score"] / 100
         metric_dict = {"lexical/sacrebleu": (None, bleu_score)}
         return metric_dict
@@ -629,9 +594,7 @@ class TERMetric(BaseMetric):
         split_name: str = None,
     ) -> Tuple[List[float], float]:
 
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=reference_texts
-        )
+        metric_results = self._metric.compute(predictions=generated_texts, references=reference_texts)
         score = metric_results["score"] / 100
         metric_dict = {"lexical/ter": (None, score)}
         return metric_dict
@@ -652,9 +615,7 @@ class chrFmetric(BaseMetric):
         split_name: str = None,
     ) -> Tuple[List[float], float]:
 
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=reference_texts
-        )
+        metric_results = self._metric.compute(predictions=generated_texts, references=reference_texts)
         score = metric_results["score"] / 100
         metric_dict = {"lexical/chrf": (None, score)}
         return metric_dict
@@ -663,9 +624,7 @@ class chrFmetric(BaseMetric):
 class IntentAccuracyDailyDialog(BaseMetric):
     def __init__(self) -> None:
         super().__init__()
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "rajkumarrrk/roberta-daily-dialog-intent-classifier"
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained("rajkumarrrk/roberta-daily-dialog-intent-classifier")
         self._model = AutoModelForSequenceClassification.from_pretrained(
             "rajkumarrrk/roberta-daily-dialog-intent-classifier"
         )
@@ -690,18 +649,13 @@ class IntentAccuracyDailyDialog(BaseMetric):
             return input_text
 
         # we have to extract the history utterances
-        input_texts = [
-            get_input_for_classifier(prompt, gen)
-            for prompt, gen in zip(prompt_texts, generated_texts)
-        ]
+        input_texts = [get_input_for_classifier(prompt, gen) for prompt, gen in zip(prompt_texts, generated_texts)]
 
         # extract target intents
         target_intents = [info["intent"][0] - 1 for info in meta_infos]
 
         # tokenize
-        encoded = self._tokenizer(
-            input_texts, return_tensors="pt", truncation=True, padding=True
-        )
+        encoded = self._tokenizer(input_texts, return_tensors="pt", truncation=True, padding=True)
 
         with torch.no_grad():
             outputs = self._model(
@@ -710,12 +664,46 @@ class IntentAccuracyDailyDialog(BaseMetric):
             )
             pred_labels = torch.argmax(outputs.logits, dim=1).tolist()
 
-        matching_scores = (np.array(pred_labels) == np.array(target_intents)).astype(
-            np.int32
-        )
+        matching_scores = (np.array(pred_labels) == np.array(target_intents)).astype(np.int32)
         intent_accuracy = np.mean(matching_scores)
 
         metric_dict = {"intent/accuracy": (matching_scores.tolist(), intent_accuracy)}
+        return metric_dict
+
+
+class AugmentedSummarizationRouge(BaseMetric):
+    def __init__(self, batch_size: int = 8) -> None:
+        super().__init__()
+        from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
+
+        self._summarization_model = GLOBAL_SUMMARIZATION_MODEL
+        self._metric = load_metric("rouge")
+        self._batch_size = batch_size
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ) -> Tuple[List[float], float]:
+        outputs = []
+        for i in tqdm(range(0, len(generated_texts), self._batch_size)):
+            torch.cuda.empty_cache()
+            input = generated_texts[i : i + self._batch_size]
+            outputs = outputs + self._summarization_model.summarize(input)
+
+        metric_results = self._metric.compute(
+            predictions=outputs,
+            references=reference_texts,
+        )
+        score_keys = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
+        metric_dict = {}
+        for rouge_type in score_keys:
+            rouge_score = metric_results[rouge_type].mid.fmeasure
+            metric_dict[f"lexical/rouge_{rouge_type}"] = (None, rouge_score)
         return metric_dict
 
 

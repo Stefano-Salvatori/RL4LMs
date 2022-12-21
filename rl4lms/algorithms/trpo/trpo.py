@@ -234,6 +234,7 @@ class TRPO(OnPolicyAlgorithm):
         """
         # Switch to train mode (this affects batch norm / dropout)
         #self.policy.set_training_mode(True)
+        self.policy.train()
         
         # Update optimizer learning rate
         self._update_learning_rate(self.policy.optimizer)

@@ -29,7 +29,7 @@ from rl4lms.envs.text_generation.utils_supervised import (get_datasets_for_causa
                                                            tokenize_seq2seq,
                                                            EvalCallack)
 from rl4lms.envs.text_generation.warm_start import TrainerWarmStartMixin
-
+import torch
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
     tokenizer = AutoTokenizer.from_pretrained(
@@ -208,7 +208,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state)
-
+            torch.cuda.empty_cache()
             # evaluate on val set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
                 self._evaluate_on_datapools(epoch=epoch, splits=["val"])
