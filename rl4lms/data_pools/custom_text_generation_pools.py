@@ -1,3 +1,4 @@
+from typing import List
 from rl4lms.data_pools.text_generation_pool import TextGenPool, Sample
 from rl4lms.data_pools.task_utils.totto import preprocess_utils
 from datasets import load_dataset
@@ -581,6 +582,42 @@ class DailyDialog(TextGenPool):
         dp_instance = cls(samples)
         return dp_instance
 
+class SamSumWithAnnotations(TextGenPool):
+    @classmethod
+    def get_dialogues(cls, split: str, path:str, type:str = "source") -> List[str]:
+        assert type in ["source", "target"], "You must select sources or targets"
+        with open(os.path.join(path, f"{split}.{type}"), encoding="utf-8") as f:
+            dialogues =  f.readlines()
+        return dialogues
+
+    @classmethod
+    def prepare(cls,
+                split: str,
+                clean_dataset_path:str,
+                annotated_dataset_path:str,
+                target_path:str,
+                prompt_suffix: str = "",
+                prompt_prefix: str = "",
+                max_size: int = None):
+        clean_dialogues = SamSumWithAnnotations.get_dialogues(split, clean_dataset_path, type="source")
+        annotated_dialogues = SamSumWithAnnotations.get_dialogues(split, annotated_dataset_path, type="source")
+        target_summaries = SamSumWithAnnotations.get_dialogues(split, target_path, type="target")
+        samples = []
+        for ix, (clean_dialogue, annotated_dialogue, target_summary) in enumerate(zip(clean_dialogues, annotated_dialogues, target_summaries)):
+            sample = Sample(id=f"{split}_{ix}",
+                            prompt_or_input_text=prompt_prefix +
+                            clean_dialogue + prompt_suffix,
+                            references=[target_summary],
+                            meta_data={"annotated_input":annotated_dialogue}
+                            )
+            samples.append(sample)
+
+            if max_size is not None and ix == (max_size-1):
+                break
+
+        pool_instance = cls(samples)
+        return pool_instance
+
 class SamSum(TextGenPool):
     @classmethod
     def prepare(cls,
@@ -588,6 +625,8 @@ class SamSum(TextGenPool):
                 prompt_suffix: str = "",
                 prompt_prefix: str = "",
                 max_size: int = None):
+
+
         dataset = load_dataset("samsum")
         dataset_split = CommonGen.gen_split_name(split)
         samples = []
