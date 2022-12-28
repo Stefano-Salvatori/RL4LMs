@@ -570,17 +570,53 @@ class LetterCounterRewardFunction(RewardFunction):
         return 0
 
 
+# class RougeSummarizerRewardFunction(RewardFunction):
+#     def __init__(
+#         self,
+#     ) -> None:
+#         super().__init__()
+
+#         from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
+
+#         self._summarization_model = GLOBAL_SUMMARIZATION_MODEL
+
+#         self._metric = load_metric("rouge")
+
+#     def __call__(
+#         self,
+#         prev_observation: Observation,
+#         action: int,
+#         current_observation: Observation,
+#         done: bool,
+#         meta_info: Dict[str, Any] = None,
+#     ) -> float:
+#         if done:
+#             summary = self._summarization_model.summarize(current_observation.context_text)
+#             metric_results = self._metric.compute(
+#                 predictions=summary, references=current_observation.target_or_reference_texts, use_stemmer=True
+#             )
+#             rouge_keys = ["rouge1", "rouge2", "rougeL"]
+#             reward = np.mean([metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys])
+#             return reward
+#         return 0
+
+
 class RougeSummarizerRewardFunction(RewardFunction):
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self, alpha: float = 0.5) -> None:
+        """_summary_
+
+        Args:
+            alpha (float, optional): Weight of the rouge reward. Defaults to 0.5.
+        """
         super().__init__()
 
         from rl4lms.global_model import GLOBAL_SUMMARIZATION_MODEL
 
         self._summarization_model = GLOBAL_SUMMARIZATION_MODEL
 
-        self._metric = load_metric("rouge")
+        self._summarization_metric = load_metric("rouge")
+        self._tagging_metric = load_metric("f1")
+        self.alpha = alpha
 
     def __call__(
         self,
@@ -591,14 +627,65 @@ class RougeSummarizerRewardFunction(RewardFunction):
         meta_info: Dict[str, Any] = None,
     ) -> float:
         if done:
-            summary = self._summarization_model.summarize(current_observation.context_text)
-            metric_results = self._metric.compute(
-                predictions=summary, references=current_observation.target_or_reference_texts, use_stemmer=True
+            generated_annotated_dialogue = current_observation.context_text
+            rouge_summarization_reward = self.__summarization_reward(
+                generated_annotated_dialogue, current_observation.target_or_reference_texts
             )
-            rouge_keys = ["rouge1", "rouge2", "rougeL"]
-            reward = np.mean([metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys])
-            return reward
+            tagging_accuracy_reward = 0
+            if meta_info is not None and "annotated_input" in meta_info:
+                tagging_accuracy_reward = self.__tagging_accuracy_reward(
+                    generated_annotated_dialogue, meta_info["annotated_input"]
+                )
+            return self.alpha * rouge_summarization_reward + (1 - self.alpha) * tagging_accuracy_reward
         return 0
+
+    def __summarization_reward(self, model_output: str, target_summary: str):
+        summary = self._summarization_model.summarize(model_output)
+        metric_results = self._summarization_metric.compute(
+            predictions=summary, references=target_summary, use_stemmer=True
+        )
+        rouge_keys = ["rouge1", "rouge2", "rougeL"]
+        return np.mean([metric_results[rouge_type].mid.fmeasure for rouge_type in rouge_keys])
+
+    def __tagging_accuracy_reward(self, model_output: str, target_annotations: str):
+        target_classes = self.__getTokensClasses(target_annotations)
+        predicted_classes = self.__getTokensClasses(model_output)
+
+        if len(predicted_classes) > len(target_classes):
+            predicted_classes = predicted_classes[: len(target_classes)]
+        elif len(predicted_classes) < len(target_classes):
+            predicted_classes.extend([-1] * (len(target_classes) - len(predicted_classes)))
+
+        return self._tagging_metric.compute(predictions=predicted_classes, references=target_classes, average="macro")[
+            "f1"
+        ]
+
+    def __getTokensClasses(self, annotated_dialogue: str):
+        tClass = []
+        annotated_dialogue = annotated_dialogue.replace("<sl>", " <sl> ")
+        annotated_dialogue = annotated_dialogue.replace("<\sl>", " <\sl> ")
+
+        sl = False
+        hl = False
+        for t in annotated_dialogue.split():
+            if t == "<sl>":
+                sl = True
+            elif t == "<\sl>":
+                sl = False
+            elif t == "<hl>":
+                hl = True
+            elif t == "<\hl>":
+                hl = False
+            else:
+                if sl and hl:
+                    tClass.append(3)
+                elif sl:
+                    tClass.append(2)
+                elif hl:
+                    tClass.append(1)
+                else:
+                    tClass.append(0)
+        return tClass
 
 
 class BatchedRougeSummarizerRewardFunction(BatchedRewardFunction):

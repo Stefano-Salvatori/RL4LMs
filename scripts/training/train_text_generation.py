@@ -2,7 +2,7 @@ import os
 from argparse import ArgumentParser
 
 import yaml
-
+import datetime
 from rl4lms.envs.text_generation.logging_utils import Tracker
 from rl4lms.envs.text_generation.training_utils import (
     OnPolicyTrainer,
@@ -28,11 +28,11 @@ def main(
 
     # We istantiate the summarization model so that it can be used by the reward and metric function
     GLOBAL_SUMMARIZATION_MODEL.istantiate(
-        load_path=config["shared_summarization_model"]["load_path"],
-        max_new_tokens=config["shared_summarization_model"]["max_new_tokens"],
-        device=config["shared_summarization_model"]["device"],
-        base_model=config["shared_summarization_model"]["base_model"],
-        load_from_state_dict=config["shared_summarization_model"]["load_from_state_dict"],
+        load_path=config["shared_summarization_model"].get("load_path", None),
+        max_new_tokens=config["shared_summarization_model"].get("max_new_tokens", None),
+        device=config["shared_summarization_model"].get("device", None),
+        base_model=config["shared_summarization_model"].get("base_model", None),
+        load_from_state_dict=config["shared_summarization_model"].get("load_from_state_dict", None),
     )
 
     # load tracker
@@ -40,7 +40,7 @@ def main(
         base_path_to_store_results,
         config,
         project_name,
-        experiment_name,
+        f"{experiment_name}_{datetime.datetime.now().strftime('%d-%m-%y_%H_%M')}",
         entity_name,
         log_to_wandb,
     )

@@ -21,6 +21,7 @@ from rl4lms.data_pools.custom_text_generation_pools import (
     WMT16NewsOnlyDatasetEnDe,
     DailyDialog,
     SamSum,
+    SamSumWithAnnotations,
 )
 from rl4lms.data_pools.text_generation_pool import TextGenPool
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
@@ -46,6 +47,7 @@ from rl4lms.envs.text_generation.metric import (
     TERMetric,
     chrFmetric,
     IntentAccuracyDailyDialog,
+    TaggingAccuracy,
 )
 from rl4lms.envs.text_generation.policy.base_policy import LMActorCriticPolicy
 from rl4lms.envs.text_generation.policy.causal_policy import (
@@ -104,6 +106,7 @@ class DataPoolRegistry:
         "crd3": CRD3DialogueGeneration,
         "daily_dialog": DailyDialog,
         "samsum": SamSum,
+        "annotated_samsum": SamSumWithAnnotations,
     }
 
     @classmethod
@@ -178,6 +181,7 @@ class MetricRegistry:
         "chrf": chrFmetric,
         "intent_accuracy": IntentAccuracyDailyDialog,
         "augmented_summarization_rouge": AugmentedSummarizationRouge,
+        "tagging_accuracy": TaggingAccuracy,
     }
 
     @classmethod

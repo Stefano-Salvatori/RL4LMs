@@ -47,7 +47,9 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin)
         generation_kwargs: Dict[str, Any] = {},
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
+        freeze_encoder: bool = False,
     ):
+        self._freeze_encoder = freeze_encoder
         super().__init__(
             observation_space,
             action_space,
@@ -68,6 +70,10 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin)
         self._policy_model.__class__ = override_generation_routines(
             type(self._policy_model)
         )
+        if self._freeze_encoder:
+            for param_name, param_value in  self._policy_model.named_parameters():
+                if "encoder" in param_name:
+                    param_value.requires_grad = False
 
         self._value_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         self._ref_model = deepcopy(self._policy_model).eval()

@@ -707,6 +707,66 @@ class AugmentedSummarizationRouge(BaseMetric):
         return metric_dict
 
 
+class TaggingAccuracy(BaseMetric):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._metric = load_metric("f1")
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ) -> Tuple[List[float], float]:
+        predictions = []
+        references = []
+        for (generated, reference) in zip(generated_texts, meta_infos):
+            target_classes = self.__getTokensClasses(reference["annotated_input"])
+            predicted_classes = self.__getTokensClasses(generated)
+            if len(predicted_classes) > len(target_classes):
+                predicted_classes = predicted_classes[: len(target_classes)]
+            elif len(predicted_classes) < len(target_classes):
+                predicted_classes.extend([-1] * (len(target_classes) - len(predicted_classes)))
+
+            predictions.append(predicted_classes)
+            references.append(target_classes)
+        metric_results = self._metric.compute(
+            predictions=predicted_classes, references=target_classes, average="macro"
+        )
+        return {"tagging/f1": (None, metric_results["f1"])}
+
+    def __getTokensClasses(self, annotated_dialogue: str):
+        tClass = []
+        annotated_dialogue = annotated_dialogue.replace("<sl>", " <sl> ")
+        annotated_dialogue = annotated_dialogue.replace("<\sl>", " <\sl> ")
+
+        sl = False
+        hl = False
+        for t in annotated_dialogue.split():
+            if t == "<sl>":
+                sl = True
+            elif t == "<\sl>":
+                sl = False
+            elif t == "<hl>":
+                hl = True
+            elif t == "<\hl>":
+                hl = False
+            else:
+                if sl and hl:
+                    tClass.append(3)
+                elif sl:
+                    tClass.append(2)
+                elif hl:
+                    tClass.append(1)
+                else:
+                    tClass.append(0)
+        return tClass
+
+
 if __name__ == "__main__":
     prompt_texts = [""]
     gen_texts = ["Hello there general kenobi", "foo bar foobar"]
