@@ -1,26 +1,31 @@
 tokenizer:
   model_name: /home/raffoni/DearWatson/best_checkpoint/t5-sl
-  padding_side: left
-  truncation_side: left
+  padding_side: right
+  truncation_side: right
   pad_token_as_eos_token: True
 
 shared_summarization_model:
   load_path: "/home/italiani/dear-watson/DearWatson/bart_large_sl/best_model.pth"
-  max_new_tokens: 128
-  device: "cuda"
+  max_new_tokens: 100
+  num_beams: 5
+  device: "cuda:1"
   base_model: "facebook/bart-large"
   load_from_state_dict: True
 
 reward_fn:
   id: summarizer_rouge
+  args:
+    alpha: 0.3
 
 datapool:
-  id: samsum
-  #args:
-  #  prompt_prefix: "Summarize: "
+  id: annotated_samsum
+  args:
+    clean_dataset_path: "/datasets/Dialogue/SAMsum/clean"
+    annotated_dataset_path: "/datasets/Dialogue/SAMsum/sl"
+    target_path: "/datasets/Dialogue/SAMsum/targets"
 
 env:
-  n_envs: 2
+  n_envs: 4
   args:
     max_prompt_length: 512
     max_episode_length: 512
@@ -32,18 +37,18 @@ alg:
   id: ppo
   args:
     n_steps: 512
-    batch_size: 2
+    batch_size: 12
     verbose: 0
-    learning_rate: 0.000001
+    learning_rate: 0.0000005
     n_epochs: 5
     ent_coef: 0.01
-    gamma: 0.995
+    gamma: 0.998
     gae_lambda: 0.95
     vf_coef: 0.2
     clip_range: 0.2
   kl_div:
-    coeff: 0.001
-    target_kl: 0.1
+    coeff: 0.2
+    target_kl: 0.2
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
@@ -55,6 +60,7 @@ alg:
         top_k: 20
         min_length: 40
         max_new_tokens: 512
+      freeze_encoder: False
 
 train_evaluation:
   eval_batch_size: 16
@@ -65,6 +71,7 @@ train_evaluation:
     - id: augmented_summarization_rouge
       args:
         batch_size: 16
+    - id: tagging_accuracy
   generation_kwargs:
     do_sample: True
     top_k: 0
