@@ -30,6 +30,7 @@ def main(
     GLOBAL_SUMMARIZATION_MODEL.istantiate(
         load_path=config["shared_summarization_model"].get("load_path", None),
         max_new_tokens=config["shared_summarization_model"].get("max_new_tokens", None),
+        num_beams=config["shared_summarization_model"].get("num_beams", None),
         device=config["shared_summarization_model"].get("device", None),
         base_model=config["shared_summarization_model"].get("base_model", None),
         load_from_state_dict=config["shared_summarization_model"].get("load_from_state_dict", None),
