@@ -45,7 +45,7 @@ class SummarizationModel:
         else:
             self._model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
 
-        # self._model.half()
+        self._model.half()
         self._device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model.to(device)
         self._model.eval()

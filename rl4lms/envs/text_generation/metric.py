@@ -698,6 +698,7 @@ class AugmentedSummarizationRouge(BaseMetric):
         metric_results = self._metric.compute(
             predictions=outputs,
             references=reference_texts,
+            use_stemmer=True
         )
         score_keys = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
         metric_dict = {}
