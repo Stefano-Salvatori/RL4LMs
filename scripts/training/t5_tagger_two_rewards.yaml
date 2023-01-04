@@ -7,7 +7,7 @@ tokenizer:
 shared_summarization_model:
   load_path: "/home/italiani/dear-watson/DearWatson/bart_large_sl/best_model.pth"
   max_new_tokens: 100
-  num_beams: 5
+  # num_beams: 5
   device: "cuda:1"
   base_model: "facebook/bart-large"
   load_from_state_dict: True
@@ -15,7 +15,7 @@ shared_summarization_model:
 reward_fn:
   id: summarizer_rouge
   args:
-    alpha: 0.3
+    alpha: 0.5
 
 datapool:
   id: annotated_samsum
@@ -27,8 +27,8 @@ datapool:
 env:
   n_envs: 4
   args:
-    max_prompt_length: 512
-    max_episode_length: 512
+    max_prompt_length: 256
+    max_episode_length: 256
     terminate_on_eos: True
     prompt_truncation_side: "right"
     context_start_token: 0
@@ -36,19 +36,19 @@ env:
 alg:
   id: ppo
   args:
-    n_steps: 512
-    batch_size: 12
+    n_steps: 256
+    batch_size: 4
     verbose: 0
     learning_rate: 0.0000005
     n_epochs: 5
-    ent_coef: 0.01
+    ent_coef: 0.02
     gamma: 0.998
     gae_lambda: 0.95
     vf_coef: 0.2
     clip_range: 0.2
   kl_div:
-    coeff: 0.2
-    target_kl: 0.2
+    coeff: 0.3
+    target_kl: 0.1
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
@@ -57,7 +57,7 @@ alg:
       prompt_truncation_side: "right"
       generation_kwargs:
         do_sample: True
-        top_k: 20
+        top_k: 30
         min_length: 40
         max_new_tokens: 512
       freeze_encoder: False
@@ -75,6 +75,6 @@ train_evaluation:
   generation_kwargs:
     do_sample: True
     top_k: 0
-    temperature: 0.8
+    temperature: 0.9
     min_length: 40
     max_new_tokens: 512

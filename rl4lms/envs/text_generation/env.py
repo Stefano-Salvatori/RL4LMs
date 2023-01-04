@@ -80,9 +80,10 @@ class TextGenEnv(Env):
         )
         self.action_space = Discrete(n=self._vocab_size)
         # see https://github.com/huggingface/transformers/issues/4875 : rounding up to nearest power of 2 for better GPU efficiency
-        if "t5" in self.tokenizer.name_or_path:
-            n = 32128
-            self.action_space = Discrete(n=n)
+        #if "t5" in self.tokenizer.name_or_path:
+        #    # n = 32128
+        #    n=32107
+        #    self.action_space = Discrete(n=n)
         self.sampler_for_replaying = PrioritySampler(priority_scale=priority_scale)
         for sample, weight in samples:
             self.sampler_for_replaying.add(sample, weight)

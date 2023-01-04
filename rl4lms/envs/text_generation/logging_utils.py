@@ -52,7 +52,8 @@ class Tracker:
             handlers=[
                 logging.FileHandler(log_path),
                 RichHandler()
-            ]
+            ],
+            encoding="utf-8"
         )
 
         # init wandb
